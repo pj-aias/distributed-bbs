@@ -3,7 +3,9 @@ fn test_all() {
     use rand::thread_rng;
     let mut rng = thread_rng();
 
-    use crate::setup::{Issuer, Opener};
+    use crate::issuer::Issuer;
+    use crate::opener::Opener;
+
     use crate::{sign, verify, GPK, OPK};
 
     let issuer = Issuer::random(&mut rng);

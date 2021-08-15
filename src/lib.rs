@@ -4,7 +4,8 @@ extern crate slice_as_array;
 #[macro_use]
 extern crate alloc;
 
-pub mod setup;
+pub mod issuer;
+pub mod opener;
 pub mod tests;
 pub mod utils;
 
@@ -22,6 +23,15 @@ use utils::{gen_rand_g1, gen_rand_scalar};
 pub struct PairingCurve {
     pub g1: G1Projective,
     pub g2: G2Projective,
+}
+
+impl PairingCurve {
+    pub fn new() -> Self {
+        PairingCurve {
+            g1: G1Projective::generator(),
+            g2: G2Projective::generator(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
