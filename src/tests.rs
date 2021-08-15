@@ -6,7 +6,7 @@ fn test_all() {
     use crate::issuer::Issuer;
     use crate::opener::Opener;
 
-    use crate::{sign, verify, GPK, OPK};
+    use crate::{is_signed_member, sign, verify, GPK, OPK};
 
     let issuer = Issuer::random(&mut rng);
 
@@ -27,5 +27,11 @@ fn test_all() {
     let sig = sign(&usk, &gpk, &mut rng);
     verify(&sig, &gpk).unwrap();
 
-    // assert!(is_signed_member(&usk, &sig, &isk));
+    assert!(is_signed_member(
+        &usk,
+        &sig,
+        &opener1.osk,
+        &opener2.osk,
+        &opener3.osk
+    ));
 }

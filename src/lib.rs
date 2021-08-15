@@ -236,3 +236,16 @@ pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
         Err(())
     }
 }
+
+pub fn is_signed_member(
+    usk: &USK,
+    signature: &Signature,
+    osk1: &OSK,
+    osk2: &OSK,
+    osk3: &OSK,
+) -> bool {
+    let a_v =
+        signature.t4 - (signature.t1 * osk3.xi + signature.t2 * osk1.xi + signature.t3 * osk2.xi);
+
+    usk.a_i == a_v
+}
