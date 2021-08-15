@@ -4,6 +4,10 @@ extern crate slice_as_array;
 #[macro_use]
 extern crate alloc;
 
+pub mod setup;
+pub mod tests;
+pub mod utils;
+
 use alloc::vec::Vec;
 use bls12_381::{pairing, G1Projective, G2Projective, Scalar};
 use byteorder::{BigEndian, ByteOrder};
@@ -12,13 +16,38 @@ use group::{Curve, Group, GroupEncoding};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use utils::{gen_rand_g1, gen_rand_scalar};
 
 #[derive(Serialize, Deserialize)]
-pub struct GSK {
-    pub xi_1: Scalar,
-    pub xi_2: Scalar,
-    pub xi_3: Scalar,
+pub struct PairingCurve {
+    pub g1: G1Projective,
+    pub g2: G2Projective,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
+pub struct ISK {
     pub gamma: Scalar,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OSK {
+    pub xi: Scalar,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OPK {
+    pub pubkey: G1Projective,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
+pub struct IPK {
+    pub w: G2Projective,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct USK {
+    pub x: Scalar,
+    pub a_i: G1Projective,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -27,20 +56,7 @@ pub struct GPK {
     pub u: G1Projective,
     pub v: G1Projective,
     pub z: G1Projective,
-    pub w: G2Projective,
-    pub g1: G1Projective,
-    pub g2: G2Projective,
-}
-
-pub struct SetUpResult {
-    pub gpk: GPK,
-    pub gsk: GSK,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ISK {
-    pub x: Scalar,
-    pub a_i: G1Projective,
+    pub ipk: IPK,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,63 +75,24 @@ pub struct Signature {
     pub s_delta3: Scalar,
 }
 
-pub fn setup(rng: &mut impl RngCore) -> SetUpResult {
-    let g1 = G1Projective::generator();
-    let g2 = G2Projective::generator();
-
-    let xi_1 = gen_rand_scalar(rng);
-    let xi_2 = gen_rand_scalar(rng);
-    let xi_3 = gen_rand_scalar(rng);
-
-    let tmp = gen_rand_g1(rng);
-
-    let u = tmp * xi_1;
-    let v = tmp * xi_2;
-    let z = tmp * xi_3;
-
-    let h = u * xi_2 * xi_3;
-
-    let gamma = gen_rand_scalar(rng);
-    let w = g2 * gamma;
-
-    let gsk = GSK {
-        xi_1,
-        xi_2,
-        xi_3,
-        gamma,
-    };
-    let gpk = GPK {
-        h,
-        u,
-        v,
-        w,
-        z,
-        g1,
-        g2,
-    };
-
-    SetUpResult { gsk, gpk }
+impl GPK {
+    pub fn new(
+        u: G1Projective,
+        v: G1Projective,
+        z: G1Projective,
+        h: G1Projective,
+        ipk: IPK,
+    ) -> Self {
+        Self { u, v, z, h, ipk }
+    }
 }
 
-pub fn issue(gsk: &GSK, gpk: &GPK, rng: &mut impl RngCore) -> ISK {
-    let x = gen_rand_scalar(rng);
-    let tmp = (gsk.gamma + x).invert().unwrap();
-    let a_i = gpk.g1 * tmp;
+pub fn sign(usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
+    let PairingCurve { g1, g2 } = PairingCurve::new();
 
-    ISK { a_i, x }
-}
-
-pub fn sign(isk: &ISK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
-    let ISK { a_i, x } = isk;
-    let GPK {
-        h,
-        u,
-        v,
-        w,
-        z,
-        g1: _,
-        g2,
-    } = gpk;
+    let USK { a_i, x } = usk;
+    let GPK { h, u, v, z, ipk } = gpk;
+    let IPK { w } = ipk;
 
     let a = gen_rand_scalar(rng);
     let b = gen_rand_scalar(rng);
@@ -166,7 +143,7 @@ pub fn sign(isk: &ISK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
     hash.append(&mut r6.to_bytes().as_ref().to_vec());
     hash.append(&mut r7.to_bytes().as_ref().to_vec());
 
-    let hash = calc_sha256_scalar(&hash);
+    let hash = utils::calc_sha256_scalar(&hash);
 
     let sa = ra + hash * a;
     let sb = rb + hash * b;
@@ -193,6 +170,8 @@ pub fn sign(isk: &ISK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
 }
 
 pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
+    let PairingCurve { g1, g2 } = PairingCurve::new();
+
     let Signature {
         t1,
         t2,
@@ -208,15 +187,8 @@ pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
         s_delta3,
     } = signature;
 
-    let GPK {
-        h,
-        u,
-        v,
-        w,
-        z,
-        g1,
-        g2,
-    } = gpk;
+    let GPK { h, u, v, z, ipk } = gpk;
+    let IPK { w } = ipk;
 
     let r1_v = u * sa + t1 * -hash;
     let r2_v = v * sb + t2 * -hash;
@@ -249,7 +221,7 @@ pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
     hash_v.append(&mut r6_v.to_bytes().as_ref().to_vec());
     hash_v.append(&mut r7_v.to_bytes().as_ref().to_vec());
 
-    let hash_v = calc_sha256_scalar(&hash_v);
+    let hash_v = utils::calc_sha256_scalar(&hash_v);
 
     if hash_v == *hash {
         Ok(())
@@ -258,40 +230,8 @@ pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
     }
 }
 
-pub fn is_signed_member(isk: &ISK, signature: &Signature, gsk: &GSK) -> bool {
-    let a_v = signature.t3 - (signature.t1 * gsk.xi_2 + signature.t2 * gsk.xi_1);
+// pub fn is_signed_member(usk: &USK, signature: &Signature, isk: &ISK) -> bool {
+//     let a_v = signature.t3 - (signature.t1 * isk.xi_2 + signature.t2 * isk.xi_1);
 
-    isk.a_i == a_v
-}
-
-fn calc_sha256_scalar(vec: &[u8]) -> Scalar {
-    let mut hasher = Sha256::new();
-    hasher.update(vec);
-    let hashed = hasher.finalize().to_vec();
-
-    let mut schalar: Vec<u64> = vec![0; hashed.len() / 8];
-    BigEndian::read_u64_into(&hashed, &mut schalar);
-    let schalar = slice_as_array!(&schalar, [u64; 4]).unwrap();
-
-    Scalar::from_raw(*schalar)
-}
-
-fn gen_rand_scalar(rng: &mut impl RngCore) -> Scalar {
-    Scalar::random(rng)
-}
-
-fn gen_rand_g1(rng: &mut impl RngCore) -> G1Projective {
-    G1Projective::random(rng)
-}
-
-#[test]
-fn test_all() {
-    use rand::thread_rng;
-    let mut rng = thread_rng();
-    let SetUpResult { gsk, gpk } = setup(&mut rng);
-    let isk = issue(&gsk, &gpk, &mut rng);
-    let sig = sign(&isk, &gpk, &mut rng);
-    verify(&sig, &gpk).unwrap();
-
-    // assert!(is_signed_member(&isk, &sig, &gsk));
-}
+//     usk.a_i == a_v
+// }
