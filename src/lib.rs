@@ -239,15 +239,14 @@ pub fn verify(msg: &[u8], signature: &Signature, gpk: &GPK) -> Result<(), ()> {
     }
 }
 
-pub fn is_signed_member(
+pub fn open_combain(
     usk: &USK,
     signature: &Signature,
-    osk1: &OSK,
-    osk2: &OSK,
-    osk3: &OSK,
+    share1: &G1Projective,
+    share2: &G1Projective,
+    share3: &G1Projective,
 ) -> bool {
-    let a_v =
-        signature.t4 - (signature.t1 * osk3.xi + signature.t2 * osk1.xi + signature.t3 * osk2.xi);
+    let a_v = signature.t4 - (share1 + share2 + share3);
 
     usk.a_i == a_v
 }
