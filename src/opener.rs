@@ -1,6 +1,6 @@
 use crate::utils::gen_rand_scalar;
-use crate::{PairingCurve, IPK, ISK, OPK, OSK, USK};
-use bls12_381::{G1Projective, G2Projective, Scalar};
+use crate::{OPK, OSK};
+use bls12_381::{G1Projective, Scalar};
 use rand::RngCore;
 
 pub struct Opener {

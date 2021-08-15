@@ -11,13 +11,10 @@ pub mod utils;
 
 use alloc::vec::Vec;
 use bls12_381::{pairing, G1Projective, G2Projective, Scalar};
-use byteorder::{BigEndian, ByteOrder};
-use ff::Field;
-use group::{Curve, Group, GroupEncoding};
+use group::{Curve, GroupEncoding};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use utils::{gen_rand_g1, gen_rand_scalar};
+use utils::gen_rand_scalar;
 
 #[derive(Serialize, Deserialize)]
 pub struct PairingCurve {
@@ -98,7 +95,7 @@ impl GPK {
 }
 
 pub fn sign(usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
-    let PairingCurve { g1, g2 } = PairingCurve::new();
+    let PairingCurve { g1: _, g2 } = PairingCurve::new();
 
     let USK { a_i, x } = usk;
     let GPK { h, u, v, z, ipk } = gpk;
@@ -239,9 +236,3 @@ pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
         Err(())
     }
 }
-
-// pub fn is_signed_member(usk: &USK, signature: &Signature, isk: &ISK) -> bool {
-//     let a_v = signature.t3 - (signature.t1 * isk.xi_2 + signature.t2 * isk.xi_1);
-
-//     usk.a_i == a_v
-// }

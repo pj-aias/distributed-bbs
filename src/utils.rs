@@ -1,8 +1,7 @@
 use alloc::vec::Vec;
-use bls12_381::{pairing, G1Projective, G2Projective, Scalar};
+use bls12_381::Scalar;
 use byteorder::{BigEndian, ByteOrder};
 use ff::Field;
-use group::Group;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 
@@ -20,8 +19,4 @@ pub(crate) fn calc_sha256_scalar(vec: &[u8]) -> Scalar {
 
 pub(crate) fn gen_rand_scalar(rng: &mut impl RngCore) -> Scalar {
     Scalar::random(rng)
-}
-
-pub(crate) fn gen_rand_g1(rng: &mut impl RngCore) -> G1Projective {
-    G1Projective::random(rng)
 }
