@@ -94,7 +94,7 @@ impl GPK {
     }
 }
 
-pub fn sign(usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
+pub fn sign(msg: &[u8], usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
     let PairingCurve { g1: _, g2 } = PairingCurve::new();
 
     let USK { a_i, x } = usk;
@@ -139,6 +139,7 @@ pub fn sign(usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
     let r7 = t3 * rx + z * -r_delta3;
 
     let mut hash: Vec<u8> = vec![];
+    hash.append(&mut msg.to_vec());
     hash.append(&mut t1.to_bytes().as_ref().to_vec());
     hash.append(&mut t2.to_bytes().as_ref().to_vec());
     hash.append(&mut t3.to_bytes().as_ref().to_vec());
@@ -176,7 +177,7 @@ pub fn sign(usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
     }
 }
 
-pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
+pub fn verify(msg: &[u8], signature: &Signature, gpk: &GPK) -> Result<(), ()> {
     let PairingCurve { g1, g2 } = PairingCurve::new();
 
     let Signature {
@@ -217,6 +218,7 @@ pub fn verify(signature: &Signature, gpk: &GPK) -> Result<(), ()> {
     let r7_v = t3 * sx + z * -s_delta3;
 
     let mut hash_v: Vec<u8> = vec![];
+    hash_v.append(&mut msg.to_vec());
     hash_v.append(&mut t1.to_bytes().as_ref().to_vec());
     hash_v.append(&mut t2.to_bytes().as_ref().to_vec());
     hash_v.append(&mut t3.to_bytes().as_ref().to_vec());

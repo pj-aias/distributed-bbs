@@ -1,12 +1,17 @@
 #[test]
 fn test_all() {
+    use alloc::vec::Vec;
     use rand::thread_rng;
-    let mut rng = thread_rng();
 
     use crate::issuer::Issuer;
     use crate::opener::Opener;
 
     use crate::{is_signed_member, sign, verify, GPK, OPK};
+
+    let msg: Vec<u8> = vec![1, 3, 4, 5];
+    let msg2: Vec<u8> = vec![1, 3, 4, 5, 5];
+
+    let mut rng = thread_rng();
 
     let issuer = Issuer::random(&mut rng);
 
@@ -24,8 +29,15 @@ fn test_all() {
     let gpk = GPK::new(u, v, z, h, issuer.ipk);
     let usk = issuer.issue(&mut rng);
 
-    let sig = sign(&usk, &gpk, &mut rng);
-    verify(&sig, &gpk).unwrap();
+    let sig = sign(&msg, &usk, &gpk, &mut rng);
+    verify(&msg, &sig, &gpk).unwrap();
+
+    match verify(&msg2, &sig, &gpk) {
+        Ok(_) => {}
+        Err(_) => {
+            assert!(true);
+        }
+    };
 
     assert!(is_signed_member(
         &usk,
