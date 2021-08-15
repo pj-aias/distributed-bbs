@@ -4,9 +4,9 @@ fn test_all() {
     use rand::thread_rng;
 
     use crate::issuer::Issuer;
-    use crate::opener::Opener;
+    use crate::opener::{Opener, OpenerId};
 
-    use crate::{is_signed_member, sign, verify, GPK, OPK};
+    use crate::{open_combain, sign, verify, GPK, OPK};
 
     let msg: Vec<u8> = vec![1, 3, 4, 5];
     let msg2: Vec<u8> = vec![1, 3, 4, 5, 5];
@@ -15,9 +15,9 @@ fn test_all() {
 
     let issuer = Issuer::random(&mut rng);
 
-    let opener1 = Opener::random(&mut rng);
-    let opener2 = Opener::random(&mut rng);
-    let opener3 = Opener::random(&mut rng);
+    let opener1 = Opener::random(OpenerId::One, &mut rng);
+    let opener2 = Opener::random(OpenerId::Two, &mut rng);
+    let opener3 = Opener::random(OpenerId::Three, &mut rng);
 
     let u = opener1.gen_pubkey(&opener2.opk);
     let v = opener2.gen_pubkey(&opener3.opk);
@@ -39,11 +39,9 @@ fn test_all() {
         }
     };
 
-    assert!(is_signed_member(
-        &usk,
-        &sig,
-        &opener1.osk,
-        &opener2.osk,
-        &opener3.osk
-    ));
+    let s1 = opener1.open_share(&sig);
+    let s2 = opener2.open_share(&sig);
+    let s3 = opener3.open_share(&sig);
+
+    assert!(open_combain(&usk, &sig, &s1, &s2, &s3));
 }
