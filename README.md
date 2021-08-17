@@ -1,2 +1,2 @@
-# bbs distributed tracebility
+# distributed bbs
 BBS signature distributed tracebility
