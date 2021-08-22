@@ -36,12 +36,12 @@ pub struct ISK {
     pub gamma: Scalar,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct OSK {
     pub xi: Scalar,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct OPK {
     pub pubkey: G1Projective,
 }
@@ -51,13 +51,13 @@ pub struct IPK {
     pub w: G2Projective,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct USK {
     pub x: Scalar,
     pub a_i: G1Projective,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct GPK {
     pub h: G1Projective,
     pub u: G1Projective,
@@ -66,7 +66,7 @@ pub struct GPK {
     pub ipk: IPK,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct Signature {
     pub t1: G1Projective,
     pub t2: G1Projective,
