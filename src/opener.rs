@@ -4,6 +4,7 @@ use crate::{OPK, OSK};
 use bls12_381::{G1Projective, Scalar};
 use rand::RngCore;
 
+#[repr(u8)]
 #[derive(Copy, Clone)]
 pub enum OpenerId {
     One,
