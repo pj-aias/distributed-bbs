@@ -1,2 +1,2 @@
 # distributed bbs
-BBS signature distributed tracebility
+fully distributed BBS signature (using diffie-hellman key change)

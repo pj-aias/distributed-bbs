@@ -20,3 +20,10 @@ pub(crate) fn calc_sha256_scalar(vec: &[u8]) -> Scalar {
 pub(crate) fn gen_rand_scalar(rng: &mut impl RngCore) -> Scalar {
     Scalar::random(rng)
 }
+
+pub(crate) fn map<T, F, R>(v: &[T], f: F) -> Vec<R>
+where
+    F: Fn(&T) -> R,
+{
+    v.iter().map(&f).collect()
+}
