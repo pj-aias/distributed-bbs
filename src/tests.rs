@@ -30,14 +30,15 @@ fn test_all() {
 
     let partical_gpks = vec![gm1.gpk, gm2.gpk, gm3.gpk];
 
-    let usk = CombinedUSK { partials };
     let gpk = CombinedGPK {
         h,
+        partical_gpks,
         u,
         v,
         w,
-        partical_gpks,
     };
+
+    let usk = CombinedUSK::new(&partials);
 
     let sig = sign(&msg, &usk, &gpk, &mut rng);
     verify(&msg, &sig, &gpk).unwrap();

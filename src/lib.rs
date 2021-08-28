@@ -8,7 +8,7 @@ pub mod gm;
 pub mod tests;
 pub mod utils;
 
-// use crate::gm::Share;
+use crate::gm::CombinedPubkey;
 use alloc::vec::Vec;
 use bls12_381::Gt;
 use bls12_381::{pairing, G1Projective, G2Projective, Scalar};
@@ -79,6 +79,32 @@ pub struct Signature {
     pub s_delta1: Vec<Scalar>,
     pub s_delta2: Vec<Scalar>,
     pub s_delta3: Vec<Scalar>,
+}
+
+impl CombinedGPK {
+    pub fn new(
+        partical_gpks: &[PartialGPK],
+        u: &CombinedPubkey,
+        v: &CombinedPubkey,
+        w: &CombinedPubkey,
+        h: &CombinedPubkey,
+    ) -> Self {
+        Self {
+            partical_gpks: partical_gpks.to_vec(),
+            u: *u,
+            v: *v,
+            w: *w,
+            h: *h,
+        }
+    }
+}
+
+impl CombinedUSK {
+    pub fn new(partials: &[PartialUSK]) -> Self {
+        Self {
+            partials: partials.to_vec(),
+        }
+    }
 }
 
 pub fn sign(msg: &[u8], usk: &CombinedUSK, gpk: &CombinedGPK, rng: &mut impl RngCore) -> Signature {

@@ -21,7 +21,7 @@ pub struct GM {
     pub gsk: PartialGSK,
 }
 
-pub type CombainedPubkey = G1Projective;
+pub type CombinedPubkey = G1Projective;
 pub type OpenShare = G1Projective;
 
 impl GM {
@@ -49,7 +49,7 @@ impl GM {
         Self::new(id, &xi, &gamma)
     }
 
-    pub fn gen_combined_pubkey(&self, h: &CombainedPubkey) -> CombainedPubkey {
+    pub fn gen_combined_pubkey(&self, h: &CombinedPubkey) -> CombinedPubkey {
         h * self.gsk.xi
     }
 
