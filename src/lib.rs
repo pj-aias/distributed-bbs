@@ -1,4 +1,4 @@
-// #![no_std]
+#![no_std]
 #[macro_use]
 extern crate slice_as_array;
 #[macro_use]
