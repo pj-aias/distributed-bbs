@@ -3,31 +3,42 @@ fn test_all() {
     use alloc::vec::Vec;
     use rand::thread_rng;
 
-    use crate::issuer::Issuer;
-    use crate::opener::{Opener, OpenerId};
+    use crate::gm::{GMId, GM};
 
-    use crate::{open_combain, sign, verify, GPK, OPK};
+    use crate::{open_combain, sign, verify, CombinedGPK, CombinedUSK};
 
     let msg: Vec<u8> = vec![1, 3, 4, 5];
     let msg2: Vec<u8> = vec![1, 3, 4, 5, 5];
 
     let mut rng = thread_rng();
 
-    let issuer = Issuer::random(&mut rng);
+    let gm1 = GM::random(GMId::One, &mut rng);
+    let gm2 = GM::random(GMId::Two, &mut rng);
+    let gm3 = GM::random(GMId::Three, &mut rng);
 
-    let opener1 = Opener::random(OpenerId::One, &mut rng);
-    let opener2 = Opener::random(OpenerId::Two, &mut rng);
-    let opener3 = Opener::random(OpenerId::Three, &mut rng);
+    let u = gm1.gen_combined_pubkey(&gm2.gpk.h);
+    let v = gm2.gen_combined_pubkey(&gm3.gpk.h);
+    let w = gm3.gen_combined_pubkey(&gm1.gpk.h);
 
-    let u = opener1.gen_pubkey(&opener2.opk);
-    let v = opener2.gen_pubkey(&opener3.opk);
-    let z = opener3.gen_pubkey(&opener1.opk);
+    let h = gm3.gen_combined_pubkey(&u);
 
-    let tmp = OPK { pubkey: u };
-    let h = opener3.gen_pubkey(&tmp);
+    let partials = vec![
+        gm1.issue_member(&mut rng),
+        gm2.issue_member(&mut rng),
+        gm3.issue_member(&mut rng),
+    ];
 
-    let gpk = GPK::new(u, v, z, h, issuer.ipk);
-    let usk = issuer.issue(&mut rng);
+    let partical_gpks = vec![gm1.gpk, gm2.gpk, gm3.gpk];
+
+    let gpk = CombinedGPK {
+        h,
+        partical_gpks,
+        u,
+        v,
+        w,
+    };
+
+    let usk = CombinedUSK::new(&partials);
 
     let sig = sign(&msg, &usk, &gpk, &mut rng);
     verify(&msg, &sig, &gpk).unwrap();
@@ -39,9 +50,11 @@ fn test_all() {
         }
     };
 
-    let s1 = opener1.open_share(&sig);
-    let s2 = opener2.open_share(&sig);
-    let s3 = opener3.open_share(&sig);
+    let s1 = gm1.open_share(&sig);
+    let s2 = gm2.open_share(&sig);
+    let s3 = gm3.open_share(&sig);
 
-    assert!(open_combain(&usk, &sig, &s1, &s2, &s3));
+    for i in 0..3 {
+        assert!(open_combain(&usk.partials[i], &sig, i, &s1, &s2, &s3));
+    }
 }
