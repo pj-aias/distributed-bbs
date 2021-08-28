@@ -4,15 +4,15 @@ extern crate slice_as_array;
 #[macro_use]
 extern crate alloc;
 
-pub mod issuer;
-pub mod opener;
+pub mod gm;
 pub mod tests;
 pub mod utils;
 
-use crate::opener::Share;
+// use crate::gm::Share;
 use alloc::vec::Vec;
 use bls12_381::Gt;
 use bls12_381::{pairing, G1Projective, G2Projective, Scalar};
+use gm::OpenShare;
 use group::{Curve, GroupEncoding};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -34,35 +34,35 @@ impl PairingCurve {
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
-pub struct OSK {
+pub struct PartialGSK {
     pub gamma: Scalar,
     pub xi: Scalar,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
-pub struct OPK {
+pub struct PartialGPK {
     pub h: G1Projective,
     pub omega: G2Projective,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
-pub struct ParticalUSK {
+pub struct PartialUSK {
     pub x: Scalar,
     pub a: G1Projective,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct USK {
-    pub particals: Vec<ParticalUSK>,
+pub struct CombinedUSK {
+    pub partials: Vec<PartialUSK>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct GPK {
+pub struct CombinedGPK {
     pub h: G1Projective,
     pub u: G1Projective,
     pub v: G1Projective,
     pub w: G1Projective,
-    pub opks: Vec<OPK>,
+    pub partical_gpks: Vec<PartialGPK>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -81,17 +81,16 @@ pub struct Signature {
     pub s_delta3: Vec<Scalar>,
 }
 
-// impl GPK {
-//     pub fn new(u: G1Projective, v: G1Projective, w: G1Projective, h: G1Projective) -> Self {
-//         Self { u, v, w, h }
-//     }
-// }
-
-pub fn sign(msg: &[u8], usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signature {
+pub fn sign(msg: &[u8], usk: &CombinedUSK, gpk: &CombinedGPK, rng: &mut impl RngCore) -> Signature {
     let PairingCurve { g1: _, g2 } = PairingCurve::new();
 
-    // let USK { a, x } = usk;
-    let GPK { h, u, v, w, opks } = gpk;
+    let CombinedGPK {
+        h,
+        u,
+        v,
+        w,
+        partical_gpks,
+    } = gpk;
 
     let a = gen_rand_scalar(rng);
     let b = gen_rand_scalar(rng);
@@ -110,7 +109,7 @@ pub fn sign(msg: &[u8], usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signatu
     let t2 = v * b;
     let t3 = w * c;
 
-    let partical_usk = usk.particals.as_ref();
+    let partical_usk = usk.partials.as_ref();
 
     let t4: Vec<G1Projective> = utils::map(partical_usk, |partical| partical.a + h * (a + b + c));
 
@@ -127,7 +126,7 @@ pub fn sign(msg: &[u8], usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signatu
     let mut r4: Vec<Gt> = vec![];
     for i in 0..3 {
         let a1 = pairing(&t4[i].to_affine(), &g2.to_affine());
-        let a2 = pairing(&h.to_affine(), &opks[i].omega.to_affine());
+        let a2 = pairing(&h.to_affine(), &partical_gpks[i].omega.to_affine());
 
         let r4_content = a1 * rx + a2 * (-ra - rb - rc) + a3 * (-r_delta1 - r_delta2 - r_delta3);
         r4.push(r4_content);
@@ -181,7 +180,7 @@ pub fn sign(msg: &[u8], usk: &USK, gpk: &GPK, rng: &mut impl RngCore) -> Signatu
     }
 }
 
-pub fn verify(msg: &[u8], signature: &Signature, gpk: &GPK) -> Result<(), ()> {
+pub fn verify(msg: &[u8], signature: &Signature, gpk: &CombinedGPK) -> Result<(), ()> {
     let PairingCurve { g1, g2 } = PairingCurve::new();
 
     let Signature {
@@ -199,7 +198,13 @@ pub fn verify(msg: &[u8], signature: &Signature, gpk: &GPK) -> Result<(), ()> {
         s_delta3,
     } = signature;
 
-    let GPK { h, u, v, w, opks } = gpk;
+    let CombinedGPK {
+        h,
+        u,
+        v,
+        w,
+        partical_gpks,
+    } = gpk;
 
     let r1_v = u * sa + t1 * -hash;
     let r2_v = v * sb + t2 * -hash;
@@ -211,8 +216,8 @@ pub fn verify(msg: &[u8], signature: &Signature, gpk: &GPK) -> Result<(), ()> {
 
     for i in 0..3 {
         let a1_v = pairing(&t4[i].to_affine(), &g2.to_affine());
-        let a2_v = pairing(&h.to_affine(), &opks[i].omega.to_affine());
-        let a4_v = pairing(&t4[i].to_affine(), &opks[i].omega.to_affine());
+        let a2_v = pairing(&h.to_affine(), &partical_gpks[i].omega.to_affine());
+        let a4_v = pairing(&t4[i].to_affine(), &partical_gpks[i].omega.to_affine());
 
         let r4_v_content = a1_v * sx[i]
             + a2_v * (-sa - sb - sc)
@@ -257,14 +262,14 @@ pub fn verify(msg: &[u8], signature: &Signature, gpk: &GPK) -> Result<(), ()> {
 }
 
 pub fn open_combain(
-    usk: &USK,
+    usk: &PartialUSK,
     signature: &Signature,
     index: usize,
-    share1: &Share,
-    share2: &Share,
-    share3: &Share,
+    share1: &OpenShare,
+    share2: &OpenShare,
+    share3: &OpenShare,
 ) -> bool {
     let a_v = signature.t4[index] - (share1 + share2 + share3);
 
-    usk.particals[index].a == a_v
+    usk.a == a_v
 }
