@@ -65,7 +65,7 @@ pub struct CombinedGPK {
     pub partical_gpks: Vec<PartialGPK>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Signature {
     pub t1: G1Projective,
     pub t2: G1Projective,
@@ -296,6 +296,5 @@ pub fn open_combain(
     share3: &OpenShare,
 ) -> bool {
     let a_v = signature.t4[index] - (share1 + share2 + share3);
-
     usk.a == a_v
 }
