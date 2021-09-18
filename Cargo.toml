@@ -18,9 +18,10 @@ version = "0.10"
 default-features = false
 
 [dependencies.bbs]
-git="https://github.com/pj-aias/bbs"
-default-features = false
-branch = "main"
+#git="https://github.com/pj-aias/bbs"
+#default-features = false
+#branch = "main"
+path="../bbs"
 
 [dependencies.bls12_381]
 git="https://github.com/akakou/bls12_381/"
