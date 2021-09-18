@@ -10,7 +10,7 @@ pub mod utils;
 
 use crate::gm::CombinedPubkey;
 use alloc::vec::Vec;
-use bbs::sign::{process_sign_after_hash, process_sign_before_hash};
+use bbs::sign;
 use bbs::USK;
 use bls12_381::Gt;
 use bls12_381::{pairing, G1Projective, G2Projective, Scalar};
@@ -105,7 +105,32 @@ impl CombinedUSK {
     }
 }
 
-pub fn sign(msg: &[u8], usk: &CombinedUSK, gpk: &CombinedGPK, rng: &mut impl RngCore) -> Signature {
+pub struct SignCredBeforeHashing {
+    pub t1: G1Projective,
+    pub t2: G1Projective,
+    pub t3: G1Projective,
+    pub t4: G1Projective,
+    pub r4: Gt,
+    pub a: bbs::sign::SignCredBeforeHashing,
+    pub b: bbs::sign::SignCredBeforeHashing,
+    pub c: bbs::sign::SignCredBeforeHashing,
+    pub rx: Scalar,
+}
+
+pub struct SignCredAfterHashing {
+    pub s_a: bbs::sign::SignCredAfterHashing,
+    pub s_b: bbs::sign::SignCredAfterHashing,
+    pub s_c: bbs::sign::SignCredAfterHashing,
+}
+
+pub fn process_sign_before_hash(
+    msg: &[u8],
+    partial_usk: &PartialUSK,
+    partial_gpk: &PartialGPK,
+    combined_usk: &CombinedUSK,
+    gpk: &CombinedGPK,
+    rng: &mut impl RngCore,
+) -> SignCredBeforeHashing {
     let PairingCurve { g1: _, g2 } = PairingCurve::new();
     let i = 0;
 
@@ -119,28 +144,63 @@ pub fn sign(msg: &[u8], usk: &CombinedUSK, gpk: &CombinedGPK, rng: &mut impl Rng
 
     let rx = gen_rand_scalar(rng);
 
-    let partical_usk: &alloc::vec::Vec<bbs::USK> = usk.partials.as_ref();
-    let x = &partical_usk[i].x;
+    let a = bbs::sign::process_sign_before_hash(&partial_usk.x, &rx, u, rng);
+    let b = bbs::sign::process_sign_before_hash(&partial_usk.x, &rx, v, rng);
+    let c = bbs::sign::process_sign_before_hash(&partial_usk.x, &rx, w, rng);
 
-    let a = process_sign_before_hash(&x, &rx, u, rng);
-    let b = process_sign_before_hash(&x, &rx, v, rng);
-    let c = process_sign_before_hash(&x, &rx, w, rng);
-
-    let t4: Vec<G1Projective> = utils::map(partical_usk, |partical| {
-        partical_usk[i].a + h * (a.y + b.y + c.y)
-    });
-
+    let t4 = partial_usk.a + h * (a.y + b.y + c.y);
     let a3 = pairing(&h.to_affine(), &g2.to_affine());
 
-    let mut r4: Vec<Gt> = vec![];
+    let a1 = pairing(&t4.to_affine(), &g2.to_affine());
+    let a2 = pairing(&h.to_affine(), &partial_gpk.omega.to_affine());
 
-    let a1 = pairing(&t4[i].to_affine(), &g2.to_affine());
-    let a2 = pairing(&h.to_affine(), &partical_gpks[0].omega.to_affine());
+    let r4 = a1 * rx + a2 * (-a.r - b.r - c.r) + a3 * (-a.r_delta - b.r_delta - c.r_delta);
 
-    let r4_content = a1 * rx + a2 * (-a.r - b.r - c.r) + a3 * (-a.r_delta - b.r_delta - c.r_delta);
-    r4.push(r4_content);
+    SignCredBeforeHashing {
+        t1: a.t,
+        t2: b.t,
+        t3: c.t,
+        t4,
+        r4,
+        a,
+        b,
+        c,
+        rx,
+    }
+}
 
+pub fn process_sign_after_hash(
+    x: &Scalar,
+    rx: &Scalar,
+    cred: &SignCredBeforeHashing,
+    hash: &Scalar,
+) -> SignCredAfterHashing {
+    let s_a = bbs::sign::process_sign_after_hash(&cred.a, hash);
+    let s_b = bbs::sign::process_sign_after_hash(&cred.b, hash);
+    let s_c = bbs::sign::process_sign_after_hash(&cred.c, hash);
+
+    
+
+    SignCredAfterHashing { s_a, s_b, s_c }
+}
+
+pub fn sign(msg: &[u8], usk: &CombinedUSK, gpk: &CombinedGPK, rng: &mut impl RngCore) -> Signature {
     let mut hash: Vec<u8> = vec![];
+
+    let cred =
+        process_sign_before_hash(msg, &usk.partials[0], &gpk.partical_gpks[0], &usk, gpk, rng);
+    let SignCredBeforeHashing {
+        t1,
+        t2,
+        t3,
+        t4,
+        r4,
+        a,
+        b,
+        c,
+        rx,
+    } = cred;
+
     hash.append(&mut msg.to_vec());
     hash.append(&mut a.t.to_bytes().as_ref().to_vec());
     hash.append(&mut b.t.to_bytes().as_ref().to_vec());
@@ -152,25 +212,18 @@ pub fn sign(msg: &[u8], usk: &CombinedUSK, gpk: &CombinedGPK, rng: &mut impl Rng
     hash.append(&mut b.r_second.to_bytes().as_ref().to_vec());
     hash.append(&mut c.r_second.to_bytes().as_ref().to_vec());
 
-    hash.append(&mut r4[i].to_bytes().as_ref().to_vec());
-
-    // for i in 0..3 {
-    //     hash.append(&mut r4[i].to_bytes().as_ref().to_vec());
-    // }
+    hash.append(&mut r4.to_bytes().as_ref().to_vec());
 
     let hash = utils::calc_sha256_scalar(&hash);
 
-    let sx = utils::map(&partical_usk, |usk| rx + hash * partical_usk[0].x);
-
-    let s_a = process_sign_after_hash(&a, &hash);
-    let s_b = process_sign_after_hash(&b, &hash);
-    let s_c = process_sign_after_hash(&c, &hash);
+    let SignCredAfterHashing { s_a, s_b, s_c } =
+        process_sign_after_hash(&usk.partials[0].x, &rx, &cred, &hash);
 
     Signature {
         t1: a.t,
         t2: b.t,
         t3: c.t,
-        t4,
+        t4: vec![t4],
         hash,
         sa: s_a.s,
         sb: s_b.s,

@@ -27,3 +27,9 @@ where
 {
     v.iter().map(&f).collect()
 }
+
+pub(crate) fn enumurate<T, F, R>(v: &[T], f: F) -> Vec<R>
+where
+    F: Fn((usize, &T)) -> R,
+{
+    v.iter().enumerate().map(&f).collect()
